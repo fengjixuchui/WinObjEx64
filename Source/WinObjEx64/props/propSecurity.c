@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        28 Dec 2018
+*  DATE:        14 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -46,7 +46,9 @@ BOOL propSecurityObjectSupported(
         (nTypeIndex != ObjectTypeIoCompletion) &&
         (nTypeIndex != ObjectTypeJob) &&
         (nTypeIndex != ObjectTypeSession) &&
-        (nTypeIndex != ObjectTypeMemoryPartition))
+        (nTypeIndex != ObjectTypeMemoryPartition) &&
+        (nTypeIndex != ObjectTypeProcess) &&
+        (nTypeIndex != ObjectTypeThread))
     {
         return FALSE;
     }
@@ -144,6 +146,16 @@ PSI_ACCESS propGetAccessTable(
         This->dwAccessMax = MAX_KNOWN_MEMORYPARTITION_ACCESS_VALUE;
         AccessTable = (PSI_ACCESS)&MemoryPartitionAccessValues;
         break;
+
+    case ObjectTypeProcess:
+        This->dwAccessMax = MAX_KNOWN_PROCESS_ACCESS_VALUE;
+        AccessTable = (PSI_ACCESS)&ProcessAccessValues;
+        break;
+
+    case ObjectTypeThread:
+        This->dwAccessMax = MAX_KNOWN_THREAD_ACCESS_VALUE;
+        AccessTable = (PSI_ACCESS)&ThreadAccessValues;
+        break;
     }
 
     return AccessTable;
@@ -166,28 +178,51 @@ ACCESS_MASK propGetObjectAccessMask(
 
     if (fSet) {
         if ((SecurityInformation & OWNER_SECURITY_INFORMATION) ||
-            (SecurityInformation & GROUP_SECURITY_INFORMATION)) {
+            (SecurityInformation & GROUP_SECURITY_INFORMATION) ||
+            (SecurityInformation & LABEL_SECURITY_INFORMATION))
+        {
             AccessMask |= WRITE_OWNER;
         }
 
-        if (SecurityInformation & DACL_SECURITY_INFORMATION) {
+        if ((SecurityInformation & DACL_SECURITY_INFORMATION) ||
+            (SecurityInformation & ATTRIBUTE_SECURITY_INFORMATION) ||
+            (SecurityInformation & PROTECTED_DACL_SECURITY_INFORMATION) ||
+            (SecurityInformation & UNPROTECTED_DACL_SECURITY_INFORMATION))
+        {
             AccessMask |= WRITE_DAC;
         }
 
-        if (SecurityInformation & SACL_SECURITY_INFORMATION) {
+        if ((SecurityInformation & SACL_SECURITY_INFORMATION) ||
+            (SecurityInformation & SCOPE_SECURITY_INFORMATION) ||
+            (SecurityInformation & PROTECTED_SACL_SECURITY_INFORMATION) ||
+            (SecurityInformation & UNPROTECTED_SACL_SECURITY_INFORMATION))
+        {
             AccessMask |= ACCESS_SYSTEM_SECURITY;
+        }
+
+        if (SecurityInformation & BACKUP_SECURITY_INFORMATION) {
+
+            AccessMask |= WRITE_DAC | WRITE_OWNER | ACCESS_SYSTEM_SECURITY;
         }
     }
     else {
         //get
         if ((SecurityInformation & OWNER_SECURITY_INFORMATION) ||
             (SecurityInformation & GROUP_SECURITY_INFORMATION) ||
-            (SecurityInformation & DACL_SECURITY_INFORMATION)) {
+            (SecurityInformation & DACL_SECURITY_INFORMATION) ||
+            (SecurityInformation & LABEL_SECURITY_INFORMATION) ||
+            (SecurityInformation & ATTRIBUTE_SECURITY_INFORMATION) ||
+            (SecurityInformation & SCOPE_SECURITY_INFORMATION))
+        {
             AccessMask |= READ_CONTROL;
         }
 
         if (SecurityInformation & SACL_SECURITY_INFORMATION) {
             AccessMask |= ACCESS_SYSTEM_SECURITY;
+        }
+
+        if (SecurityInformation & BACKUP_SECURITY_INFORMATION) {
+            AccessMask |= READ_CONTROL | ACCESS_SYSTEM_SECURITY;
         }
 
     }
@@ -425,7 +460,7 @@ HRESULT propSecurityConstructor(
     _In_ IObjectSecurity *This,
     _In_ PROP_OBJECT_INFO *Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
-    _In_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags
 )
 {
@@ -438,10 +473,17 @@ HRESULT propSecurityConstructor(
     SI_ACCESS                  *TypeAccessTable = NULL;
     POBJECT_TYPE_INFORMATION    TypeInfo = NULL;
 
-    do {
-        This->ObjectContext = Context;
-        This->OpenObjectMethod = OpenObjectMethod;
+    This->ObjectContext = Context;
+    This->OpenObjectMethod = OpenObjectMethod;
+
+    if (CloseObjectMethod == NULL) {
+        This->CloseObjectMethod = (PCLOSEOBJECTMETHOD)supCloseObjectFromContext;
+    }
+    else {
         This->CloseObjectMethod = CloseObjectMethod;
+    }
+
+    do {
 
         if (!This->OpenObjectMethod(Context, &hObject, READ_CONTROL)) {
             hResult = E_ACCESSDENIED;
@@ -549,7 +591,7 @@ HRESULT propSecurityConstructor(
 HPROPSHEETPAGE propSecurityCreatePage(
     _In_ PROP_OBJECT_INFO *Context,
     _In_ POPENOBJECTMETHOD OpenObjectMethod,
-    _In_ PCLOSEOBJECTMETHOD CloseObjectMethod,
+    _In_opt_ PCLOSEOBJECTMETHOD CloseObjectMethod,
     _In_ ULONG psiFlags
 )
 {

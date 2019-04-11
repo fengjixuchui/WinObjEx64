@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       EXTRASSSDT.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        12 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -32,7 +32,7 @@ EXTRASCONTEXT SSTDlgContext[SST_Max];
 *
 * Purpose:
 *
-* KiServiceTable Dialog listview comparer function.
+* KiServiceTable/W32pServiceTable Dialog listview comparer function.
 *
 */
 INT CALLBACK SdtDlgCompareFunc(
@@ -184,10 +184,12 @@ VOID SdtDlgHandleNotify(
     _In_ EXTRASCONTEXT *pDlgContext
 )
 {
-    LPNMHDR  nhdr = (LPNMHDR)lParam;
-    INT      nImageIndex;
+    LPNMHDR nhdr = (LPNMHDR)lParam;
+    INT     nImageIndex, mark;
+    LPWSTR  lpItem;
 
     EXTRASCALLBACK CallbackParam;
+    WCHAR szBuffer[MAX_PATH + 1];
 
     if (nhdr == NULL)
         return;
@@ -216,6 +218,19 @@ VOID SdtDlgHandleNotify(
             pDlgContext->lvColumnToSort,
             nImageIndex);
 
+        break;
+
+    case NM_DBLCLK:
+        mark = ListView_GetSelectionMark(pDlgContext->ListView);
+        if (mark >= 0) {
+            lpItem = supGetItemText(pDlgContext->ListView, mark, 3, NULL);
+            if (lpItem) {
+                RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+                if (supGetWin32FileName(lpItem, szBuffer, MAX_PATH))
+                    supShowProperties(pDlgContext->hwndDlg, szBuffer);
+                supHeapFree(lpItem);
+            }
+        }
         break;
 
     default:
@@ -266,14 +281,13 @@ INT_PTR CALLBACK SdtDialogProc(
     case WM_SIZE:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
-            extrasSimpleListResize(hwndDlg, pDlgContext->SizeGrip);
+            extrasSimpleListResize(hwndDlg);
         }
         break;
 
     case WM_CLOSE:
         pDlgContext = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
         if (pDlgContext) {
-            if (pDlgContext->SizeGrip) DestroyWindow(pDlgContext->SizeGrip);
 
             dlgIndex = 0;
 
@@ -333,7 +347,7 @@ VOID SdtOutputTable(
 )
 {
     INT index, number;
-    ULONG i;
+    ULONG i, iImage;
     EXTRASCONTEXT *Context = (EXTRASCONTEXT*)GetProp(hwndDlg, T_DLGCONTEXT);
 
     LVITEM lvitem;
@@ -363,7 +377,10 @@ VOID SdtOutputTable(
     default:
         break;
     }
-    SetWindowText(hwndDlg, szBuffer);
+    
+    SetWindowText(Context->StatusBar, szBuffer);
+
+    iImage = ObManagerGetImageIndexByTypeIndex(ObjectTypeDevice);
 
     //list table
     for (i = 0; i < Count; i++) {
@@ -373,7 +390,7 @@ VOID SdtOutputTable(
         lvitem.mask = LVIF_TEXT | LVIF_IMAGE;
         lvitem.iSubItem = 0;
         lvitem.iItem = MAXINT;
-        lvitem.iImage = ObjectTypeDevice; //imagelist id
+        lvitem.iImage = iImage; //imagelist id
         RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
         ultostr(Table[i].ServiceId, szBuffer);
         lvitem.pszText = szBuffer;
@@ -470,7 +487,7 @@ VOID SdtListTable(
             }
         }
 
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (pModules == NULL)
             __leave;
 
@@ -893,7 +910,7 @@ VOID SdtListTableShadow(
         //
         // Query modules list.
         //
-        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        pModules = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (pModules == NULL) {
             MessageBox(hwndDlg, TEXT("Could not allocate memory for Modules list"), NULL, MB_ICONERROR);
             __leave;
@@ -966,6 +983,7 @@ VOID SdtListTableShadow(
             //
             // Query win32k!W32pServiceTable.
             //
+            RtlSecureZeroMemory(&rfn, sizeof(RESOLVE_INFO));
             if (!NT_SUCCESS(NtRawGetProcAddress(w32k, "W32pServiceTable", &rfn))) {
                 MessageBox(hwndDlg, TEXT("W32pServiceTable not found in win32k module"), NULL, MB_ICONERROR);
                 __leave;
@@ -1232,6 +1250,9 @@ VOID extrasCreateSSDTDialog(
 
     EXTRASCALLBACK CallbackParam;
 
+    WCHAR szText[100];
+
+
     switch (Mode) {
     case SST_Ntos:
         dlgIndex = wobjKSSTDlgId;
@@ -1271,7 +1292,15 @@ VOID extrasCreateSSDTDialog(
 
     pDlgContext->hwndDlg = hwndDlg;
     g_WinObj.AuxDialogs[dlgIndex] = hwndDlg;
-    pDlgContext->SizeGrip = supCreateSzGripWindow(hwndDlg);
+    pDlgContext->StatusBar = GetDlgItem(hwndDlg, ID_EXTRASLIST_STATUSBAR);
+
+    _strcpy(szText, TEXT("Viewing "));
+    if (Mode ==  SST_Ntos)
+        _strcat(szText, TEXT("ntoskrnl service table"));
+    else
+        _strcat(szText, TEXT("win32k service table"));
+
+    SetWindowText(hwndDlg, szText);
 
     extrasSetDlgIcon(hwndDlg);
 

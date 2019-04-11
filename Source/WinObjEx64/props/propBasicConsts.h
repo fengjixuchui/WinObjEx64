@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPBASICCONSTS.H
 *
-*  VERSION:     1.60
+*  VERSION:     1.73
 *
-*  DATE:        25 Oct 2018
+*  DATE:        06 Mar 2019
 *
 *  Consts header file for Basic property sheet.
 *
@@ -18,21 +18,7 @@
 *******************************************************************************/
 #pragma once
 
-//Calendar
-LPCWSTR Months[12] = {
-    L"Jan",
-    L"Feb",
-    L"Mar",
-    L"Apr",
-    L"May",
-    L"Jun",
-    L"Jul",
-    L"Aug",
-    L"Sep",
-    L"Oct",
-    L"Nov",
-    L"Dec"
-};
+#define T_COULD_NOT_QUERY TEXT("*Could not query requested information*")
 
 //OBJECT_HEADER Flags
 LPCWSTR T_ObjectFlags[8] = {
@@ -66,3 +52,37 @@ static VALUE_DESC TrustLabelProtectionLevel[MAX_KNOWN_TRUSTLABEL_PROTECTIONLEVEL
     { L"Windows", 0x1000 },
     { L"WinTcb", 0x2000 }
 };
+
+#define MAX_KNOWN_PROCESS_TYPE_FLAGS 9
+LPCWSTR T_ProcessTypeFlags[MAX_KNOWN_PROCESS_TYPE_FLAGS] = {
+    L"ProtectedProcess",
+    L"Wow64Process",
+    L"ProcessDeleting",
+    L"CrossSessionCreate",
+    L"Frozen",
+    L"Background",
+    L"StronglyNamed",
+    L"SecureProcess",
+    L"SubsystemProcess"
+};
+
+#define MAX_KNOWN_PS_PROTECTED_SIGNER 9
+static LPWSTR T_PSPROTECTED_SIGNER[MAX_KNOWN_PS_PROTECTED_SIGNER] = {
+    L"None",
+    L"Authenticode",
+    L"CodeGen",
+    L"Antimalware",
+    L"Lsa",
+    L"Windows",
+    L"WinTcb",
+    L"WinSystem",
+    L"App"
+};
+
+#define MAX_KNOWN_PS_PROTECTED_TYPE 3
+static LPWSTR T_PSPROTECTED_TYPE[MAX_KNOWN_PS_PROTECTED_TYPE] = {
+    L"None",
+    L"ProtectedLight",
+    L"Protected"
+};
+

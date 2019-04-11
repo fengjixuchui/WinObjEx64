@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.H
 *
-*  VERSION:     1.71
+*  VERSION:     1.73
 *
-*  DATE:        26 Jan 2019
+*  DATE:        30 Mar 2019
 *
 *  Common header file for the Kernel Debugger Driver support.
 *
@@ -57,8 +57,8 @@ typedef struct _KLDBGCONTEXT {
     //we loaded driver?
     BOOL IsOurLoad;
 
-    //are we under Wine
-    BOOL IsWine;
+    //secureboot enabled?
+    BOOL IsSecureBoot;
 
     //system object header cookie (win10+)
     UCHAR ObHeaderCookie;
@@ -82,6 +82,9 @@ typedef struct _KLDBGCONTEXT {
 
     //ntoskrnl mapped image
     PVOID NtOsImageMap;
+
+    //win32 error value from SCM
+    ULONG drvOpenLoadStatus;
 
     //syscall tables related info
     ULONG KiServiceLimit;
@@ -214,20 +217,17 @@ UCHAR ObDecodeTypeIndex(
     _In_ PVOID Object,
     _In_ UCHAR EncodedTypeIndex);
 
-_Success_(return != NULL)
 PVOID ObDumpObjectTypeVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
-_Success_(return != NULL)
 PVOID ObDumpAlpcPortObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
 
-_Success_(return != NULL)
-PVOID ObDumpDirectoryObjectVersionAware(
+PVOID ObDumpSymbolicLinkObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version);
@@ -280,6 +280,9 @@ POBJREF ObCollectionFindByAddress(
 PVOID ObGetCallbackBlockRoutine(
     _In_ PVOID CallbackBlock);
 
+BOOLEAN kdConnectDriver(
+    VOID);
+
 PVOID kdQueryIopInvalidDeviceRequest(
     VOID);
 
@@ -292,20 +295,17 @@ BOOL kdFindKiServiceTables(
     _Out_opt_ ULONG_PTR *W32pServiceTable,
     _Out_opt_ ULONG *W32pServiceLimit);
 
-ULONG_PTR KdFindCiCallbacks(
+ULONG_PTR kdFindCiCallbacks(
     _In_ PKLDBGCONTEXT Context);
 
-BOOL kdReadSystemMemory(
-    _In_    ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
-    _In_    ULONG BufferSize);
-
-_Success_(return == TRUE)
 BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
     _In_ ULONG BufferSize,
     _Out_opt_ PULONG NumberOfBytesRead);
+
+#define kdReadSystemMemory(Address, Buffer, BufferSize) \
+    kdReadSystemMemoryEx(Address, Buffer, BufferSize, NULL)
 
 BOOL __forceinline kdAddressInNtOsImage(
     _In_ PVOID Address);

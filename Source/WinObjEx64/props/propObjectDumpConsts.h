@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       PROPOBJECTDUMPCONSTS.H
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        07 Mar 2019
 *
 *  Consts header file for Object Dump module.
 *
@@ -18,7 +18,9 @@
 *******************************************************************************/
 #pragma once
 
-#define FORMAT_HEXBYTE      L"0x%02x"
+#define DUMP_CONVERSION_LENGTH 99
+
+#define FORMAT_HEXBYTE      L"0x%02X"
 #define FORMAT_HEXUSHORT    L"0x%04X"
 #define FORMAT_HEXDWORD     L"0x%08X"
 #define FORMAT_ULONG        L"%u"
@@ -53,6 +55,8 @@
 #define T_PFLT_FILTER               L"PFLT_FILTER"
 #define T_FLT_OBJECT                L"FLT_OBJECT"
 #define T_FLT_FILTER_FLAGS          L"FLT_FILTER_FLAGS"
+
+#define T_OBJECT_SYMBOLIC_LINK      L"OBJECT_SYMBOLIC_LINK"
 
 #define T_ALPC_PORT_OBJECT          L"ALPC_PORT"
 #define T_PALPC_PORT_OBJECT         L"PALPC_PORT"

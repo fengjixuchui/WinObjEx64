@@ -1,12 +1,12 @@
 /*******************************************************************************
 *
-*  (C) COPYRIGHT AUTHORS, 2015 - 2018
+*  (C) COPYRIGHT AUTHORS, 2015 - 2019
 *
 *  TITLE:       LIST.C
 *
-*  VERSION:     1.70
+*  VERSION:     1.73
 *
-*  DATE:        30 Nov 2018
+*  DATE:        30 Mar 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -235,7 +235,7 @@ VOID ListObjectDirectoryTree(
         // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
-        if (g_kdctx.IsWine) {
+        if (g_WinObj.IsWine) {
             rlen = 1024 * 64;
         }
         else {
@@ -265,7 +265,7 @@ VOID ListObjectDirectoryTree(
 
         if (0 == _strncmpi(
             objinf->TypeName.Buffer, 
-            g_ObjectTypes[ObjectTypeDirectory].Name,
+            OBTYPE_NAME_DIRECTORY,
             objinf->TypeName.Length / sizeof(WCHAR)))
         {
             ListObjectDirectoryTree(
@@ -320,7 +320,7 @@ VOID AddListViewItem(
     RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
     //check SymbolicLink
-    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeSymbolicLink].Name, cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_SYMBOLIC_LINK, cch) == 0) {
        
         bFound = supQueryLinkTarget(hObjectRootDirectory,
             &objinf->Name, 
@@ -331,7 +331,7 @@ VOID AddListViewItem(
     }
 
     //check Section
-    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeSection].Name, cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_SECTION, cch) == 0) {
         
         bFound = supQuerySectionFileInfo(hObjectRootDirectory,
             &objinf->Name, 
@@ -342,7 +342,7 @@ VOID AddListViewItem(
     }
 
     //check Driver
-    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDriver].Name, cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_DRIVER, cch) == 0) {
         
         bFound = supQueryDriverDescription(
             objinf->Name.Buffer,
@@ -353,7 +353,7 @@ VOID AddListViewItem(
     }
 
     //check Device
-    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDevice].Name, cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_DEVICE, cch) == 0) {
         
         bFound = supQueryDeviceDescription(
             objinf->Name.Buffer,
@@ -364,7 +364,7 @@ VOID AddListViewItem(
     }
 
     //check WindowStation
-    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeWinstation].Name, cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_WINSTATION, cch) == 0) {
         
         bFound = supQueryWinstationDescription(
             objinf->Name.Buffer,
@@ -375,7 +375,7 @@ VOID AddListViewItem(
     }
 
     //check Type
-    if (_strncmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeType].Name, cch) == 0) {
+    if (_strncmpi(objinf->TypeName.Buffer, OBTYPE_NAME_TYPE, cch) == 0) {
 
         bFound = supQueryTypeInfo(
             objinf->Name.Buffer,
@@ -432,7 +432,7 @@ VOID ListObjectsInDirectory(
         // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
-        if (g_kdctx.IsWine) {
+        if (g_WinObj.IsWine) {
             rlen = 1024 * 64;
         }
         else {
@@ -501,7 +501,7 @@ VOID FindObject(
         // Wine implementation of NtQueryDirectoryObject interface is very basic and incomplete.
         // It doesn't work if no input buffer specified and does not return required buffer size.
         //
-        if (g_kdctx.IsWine != FALSE) {
+        if (g_WinObj.IsWine != FALSE) {
             rlen = 1024 * 64;
         }
         else {
@@ -551,7 +551,7 @@ VOID FindObject(
                 *List = tmp;
             };
 
-        if (_strcmpi(objinf->TypeName.Buffer, g_ObjectTypes[ObjectTypeDirectory].Name) == 0) {
+        if (_strcmpi(objinf->TypeName.Buffer, OBTYPE_NAME_DIRECTORY) == 0) {
 
             newdir = (LPWSTR)supHeapAlloc((sdlen + 4) * sizeof(WCHAR) + objinf->Name.Length);
             if (newdir != NULL) {

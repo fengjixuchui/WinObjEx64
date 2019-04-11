@@ -4,9 +4,9 @@
 *
 *  TITLE:       KLDBG.C, based on KDSubmarine by Evilcry
 *
-*  VERSION:     1.71
+*  VERSION:     1.73
 *
-*  DATE:        19 Jan 2019
+*  DATE:        01 Apr 2019
 *
 *  MINIMUM SUPPORTED OS WINDOWS 7
 *
@@ -435,6 +435,50 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
 }
 
 /*
+* ObpDumpObjectWithSpecifiedSize
+*
+* Purpose:
+*
+* Return dumped object version aware.
+*
+* Use supVirtualFree to free returned buffer.
+*
+*/
+_Success_(return != NULL)
+PVOID ObpDumpObjectWithSpecifiedSize(
+    _In_ ULONG_PTR ObjectAddress,
+    _In_ ULONG ObjectSize,
+    _In_ ULONG ObjectVersion,
+    _Out_ PULONG ReadSize,
+    _Out_ PULONG ReadVersion
+)
+{
+    PVOID ObjectBuffer = NULL;
+    ULONG BufferSize = ALIGN_UP_BY(ObjectSize, PAGE_SIZE);
+
+    ObjectBuffer = supVirtualAlloc(BufferSize);
+    if (ObjectBuffer == NULL) {
+        return NULL;
+    }
+
+    if (!kdReadSystemMemory(
+        ObjectAddress,
+        ObjectBuffer,
+        (ULONG)ObjectSize))
+    {
+        supVirtualFree(ObjectBuffer);
+        return NULL;
+    }
+
+    if (ReadSize)
+        *ReadSize = ObjectSize;
+    if (ReadVersion)
+        *ReadVersion = ObjectVersion;
+
+    return ObjectBuffer;
+}
+
+/*
 * ObDumpObjectTypeVersionAware
 *
 * Purpose:
@@ -444,16 +488,18 @@ NTSTATUS ObEnumerateBoundaryDescriptorEntries(
 * Use supVirtualFree to free returned buffer.
 *
 */
-_Success_(return != NULL)
 PVOID ObDumpObjectTypeVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version
 )
 {
-    PVOID ObjectBuffer = NULL;
-    ULONG ObjectSize = 0, BufferSize = 0;
+    ULONG ObjectSize = 0;
     ULONG ObjectVersion = 0;
+
+    //assume failure
+    if (Size) *Size = 0;
+    if (Version) *Version = 0;
 
     switch (g_NtBuildNumber) {
     case 7600:
@@ -478,28 +524,11 @@ PVOID ObDumpObjectTypeVersionAware(
         break;
     }
 
-    BufferSize = ALIGN_UP_BY(ObjectSize, PAGE_SIZE);
-    ObjectBuffer = supVirtualAlloc(BufferSize);
-    if (ObjectBuffer == NULL) {
-        return NULL;
-    }
-
-    if (!kdReadSystemMemory(
-        ObjectAddress,
-        ObjectBuffer,
-        (ULONG)ObjectSize))
-    {
-        supVirtualFree(ObjectBuffer);
-        return NULL;
-    }
-
-    if (Size)
-        *Size = ObjectSize;
-
-    if (Version)
-        *Version = ObjectVersion;
-
-    return ObjectBuffer;
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
+        ObjectSize,
+        ObjectVersion,
+        Size,
+        Version);
 }
 
 /*
@@ -512,16 +541,18 @@ PVOID ObDumpObjectTypeVersionAware(
 * Use supVirtualFree to free returned buffer.
 *
 */
-_Success_(return != NULL)
 PVOID ObDumpAlpcPortObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version
 )
 {
-    PVOID ObjectBuffer = NULL;
-    ULONG ObjectSize = 0, BufferSize = 0;
+    ULONG ObjectSize = 0;
     ULONG ObjectVersion = 0;
+
+    //assume failure
+    if (Size) *Size = 0;
+    if (Version) *Version = 0;
 
     switch (g_NtBuildNumber) {
     case 7600:
@@ -543,42 +574,26 @@ PVOID ObDumpAlpcPortObjectVersionAware(
         break;
     }
 
-    BufferSize = ALIGN_UP_BY(ObjectSize, PAGE_SIZE);
-    ObjectBuffer = supVirtualAlloc(BufferSize);
-    if (ObjectBuffer == NULL) {
-        return NULL;
-    }
-
-    if (!kdReadSystemMemory(
-        ObjectAddress,
-        ObjectBuffer,
-        (ULONG)ObjectSize))
-    {
-        supVirtualFree(ObjectBuffer);
-        return NULL;
-    }
-
-    if (Size)
-        *Size = ObjectSize;
-
-    if (Version)
-        *Version = ObjectVersion;
-
-    return ObjectBuffer;
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
+        ObjectSize,
+        ObjectVersion,
+        Size,
+        Version);
 }
 
 /*
-* ObDumpDirectoryObjectVersionAware
+* ObxDumpDirectoryObjectVersionAware
 *
 * Purpose:
 *
 * Return dumped OBJECT_DIRECTORY object version aware.
 *
-* Use supHeapFree to free returned buffer.
+* Use supVirtualFree to free returned buffer.
+*
+* Note: Currently unused.
 *
 */
-_Success_(return != NULL)
-PVOID ObDumpDirectoryObjectVersionAware(
+PVOID ObxDumpDirectoryObjectVersionAware(
     _In_ ULONG_PTR ObjectAddress,
     _Out_ PULONG Size,
     _Out_ PULONG Version
@@ -586,7 +601,10 @@ PVOID ObDumpDirectoryObjectVersionAware(
 {
     ULONG ObjectVersion;
     ULONG ObjectSize = 0;
-    PVOID ObjectPtr;
+
+    //assume failure
+    if (Size) *Size = 0;
+    if (Version) *Version = 0;
 
     switch (g_NtBuildNumber) {
 
@@ -611,24 +629,64 @@ PVOID ObDumpDirectoryObjectVersionAware(
         break;
     }
 
-    ObjectPtr = supHeapAlloc(ObjectSize);
-    if (ObjectPtr == NULL)
-        return NULL;
-
-    if (!kdReadSystemMemoryEx(
-        ObjectAddress,
-        ObjectPtr,
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
         ObjectSize,
-        NULL))
-    {
-        supHeapFree(ObjectPtr);
-        return NULL;
+        ObjectVersion,
+        Size,
+        Version);
+}
+
+/*
+* ObDumpSymbolicLinkObjectVersionAware
+*
+* Purpose:
+*
+* Return dumped OBJEC_SYMBOLIC_LINK object version aware.
+*
+* Use supVirtualFree to free returned buffer.
+*
+*/
+PVOID ObDumpSymbolicLinkObjectVersionAware(
+    _In_ ULONG_PTR ObjectAddress,
+    _Out_ PULONG Size,
+    _Out_ PULONG Version
+)
+{
+    ULONG ObjectSize = 0;
+    ULONG ObjectVersion = 0;
+
+    //assume failure
+    if (Size) *Size = 0;
+    if (Version) *Version = 0;
+
+    switch (g_NtBuildNumber) {
+    case 7600:
+    case 7601:
+    case 9200:
+    case 9600:
+        ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V1);
+        ObjectVersion = 1;
+        break;
+    case 10240:
+    case 10586:
+        ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V2);
+        ObjectVersion = 2;
+        break;
+    case 14393:
+        ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V3);
+        ObjectVersion = 3;
+        break;
+    default:
+        ObjectSize = sizeof(OBJECT_SYMBOLIC_LINK_V4);
+        ObjectVersion = 4;
+        break;
     }
 
-    *Version = ObjectVersion;
-    *Size = ObjectSize;
-
-    return ObjectPtr;
+    return ObpDumpObjectWithSpecifiedSize(ObjectAddress,
+        ObjectSize,
+        ObjectVersion,
+        Size,
+        Version);
 }
 
 /*
@@ -760,7 +818,7 @@ UCHAR ObpFindHeaderCookie(
 *
 * Limitation:
 *
-* OS dependent, Windows 10 (14393 - 17763).
+* OS dependent, Windows 10 (RS1 - 19H1).
 *
 */
 PVOID ObFindPrivateNamespaceLookupTable2(
@@ -1222,7 +1280,7 @@ BOOL kdFindKiServiceTables(
 * Purpose:
 *
 * Obtain directory object kernel address by opening directory by name
-* and quering resulted handle in NtQuerySystemInformation(SystemHandleInformation) handle dump
+* and quering resulted handle in NtQuerySystemInformation(SystemExtendedHandleInformation) handle dump
 *
 */
 BOOL ObGetDirectoryObjectAddress(
@@ -1626,6 +1684,12 @@ POBJINFO ObQueryObjectByAddress(
     ULONG_PTR ObjectHeaderAddress;
     OBJECT_HEADER ObjectHeader;
 
+    if (ObjectAddress < g_kdctx.SystemRangeStart)
+        return NULL;
+
+    if (!kdConnectDriver())
+        return NULL;
+
     //
     // Read object header, fail is critical.
     //
@@ -1640,7 +1704,7 @@ POBJINFO ObQueryObjectByAddress(
     {
 #ifdef _DEBUG
         OutputDebugStringA(__FUNCTION__);
-        OutputDebugStringA("kdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed");
+        OutputDebugStringA("\r\nkdReadSystemMemoryEx(ObjectHeaderAddress(ObjectAddress)) failed");
 #endif
         return NULL;
     }
@@ -1672,15 +1736,8 @@ POBJINFO ObQueryObject(
     SIZE_T     i, l, rdirLen, ldirSz;
     LPWSTR     SingleDirName, LookupDirName;
 
-    if (
-        (lpObjectName == NULL) ||
-        (lpDirectory == NULL) ||
-        (g_kdctx.hDevice == NULL)
-
-        )
-    {
+    if (!kdConnectDriver())
         return NULL;
-    }
 
     __try {
 
@@ -2172,16 +2229,14 @@ BOOL ObCollectionCreate(
     _In_ BOOL Locked
 )
 {
-    BOOL bResult;
-
-    bResult = FALSE;
-    if (g_kdctx.hDevice == NULL) {
-        return bResult;
-    }
+    BOOL bResult = FALSE;
 
     if (Collection == NULL) {
         return bResult;
     }
+
+    if (!kdConnectDriver())
+        return bResult;
 
     if (!Locked) {
         RtlEnterCriticalSection(&g_kdctx.ListLock);
@@ -2377,6 +2432,69 @@ POBJREF ObCollectionFindByAddress(
 }
 
 /*
+* kdConnectDriver
+*
+* Purpose:
+*
+* Acquire handle of helper driver device if possible.
+*
+* N.B. 
+*
+*   If device handle is already present function immediately return TRUE.
+*   If current token is not elevated admin token function immediately return FALSE.
+*   SE_DEBUG_PRIVILEGE is required, if it cannot be assigned function return FALSE.
+*
+*/
+BOOLEAN kdConnectDriver(
+    VOID)
+{
+    NTSTATUS status;
+    HANDLE deviceHandle = NULL;
+    UNICODE_STRING usDevice;
+    OBJECT_ATTRIBUTES obja;
+    IO_STATUS_BLOCK iost;
+
+    WCHAR szDeviceName[100];
+
+    if (g_kdctx.hDevice != NULL)
+        return TRUE;
+
+    if (g_kdctx.IsFullAdmin == FALSE)
+        return FALSE;
+
+    if (supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE)) {
+
+        _strcpy(szDeviceName, TEXT("\\Device\\"));
+        _strcat(szDeviceName, KLDBGDRV);
+        RtlInitUnicodeString(&usDevice, szDeviceName);
+        InitializeObjectAttributes(&obja, &usDevice, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+        status = NtCreateFile(
+            &deviceHandle,
+            GENERIC_READ | GENERIC_WRITE,
+            &obja,
+            &iost,
+            NULL,
+            0,
+            0,
+            FILE_OPEN,
+            0,
+            NULL,
+            0);
+
+        if (NT_SUCCESS(status)) {
+            g_kdctx.hDevice = deviceHandle;
+            return TRUE;
+        }
+        else {
+            supEnablePrivilege(SE_DEBUG_PRIVILEGE, FALSE);
+        }
+    }
+
+    return FALSE;
+}
+
+/*
 * kdQueryIopInvalidDeviceRequest
 *
 * Purpose:
@@ -2479,7 +2597,6 @@ VOID kdShowError(
 * Wrapper around SysDbgReadVirtual request to the KLDBGDRV
 *
 */
-_Success_(return == TRUE)
 BOOL kdReadSystemMemoryEx(
     _In_ ULONG_PTR Address,
     _Inout_ PVOID Buffer,
@@ -2492,13 +2609,16 @@ BOOL kdReadSystemMemoryEx(
     IO_STATUS_BLOCK iost;
     SYSDBG_VIRTUAL  dbgRequest;
 
-    if (g_kdctx.hDevice == NULL)
-        return FALSE;
+    if (NumberOfBytesRead)
+        *NumberOfBytesRead = 0;
 
     if ((Buffer == NULL) || (BufferSize == 0))
         return FALSE;
 
     if (Address < g_kdctx.SystemRangeStart)
+        return FALSE;
+
+    if (!kdConnectDriver())
         return FALSE;
 
     //
@@ -2564,52 +2684,6 @@ BOOL kdReadSystemMemoryEx(
 
         return FALSE;
     }
-}
-
-/*
-* kdWriteSystemMemory
-*
-* Purpose:
-*
-* Wrapper around SysDbgWriteVirtual request to the KLDBGDRV
-*
-* NOT IMPLEMENTED
-*
-*/
-_Success_(return == TRUE)
-BOOL kdWriteSystemMemory(
-    _In_ ULONG_PTR Address,
-    _In_ PVOID Buffer,
-    _In_ ULONG BufferSize,
-    _Out_opt_ PULONG NumberOfBytesWrite
-)
-{
-    UNREFERENCED_PARAMETER(Address);
-    UNREFERENCED_PARAMETER(Buffer);
-    UNREFERENCED_PARAMETER(BufferSize);
-    UNREFERENCED_PARAMETER(NumberOfBytesWrite);
-    return FALSE;
-}
-
-/*
-* kdReadSystemMemory
-*
-* Purpose:
-*
-* Wrapper around kdReadSystemMemoryEx
-*
-*/
-BOOL kdReadSystemMemory(
-    _In_ ULONG_PTR Address,
-    _Inout_ PVOID Buffer,
-    _In_ ULONG BufferSize
-)
-{
-    return kdReadSystemMemoryEx(
-        Address,
-        Buffer,
-        BufferSize,
-        NULL);
 }
 
 /*
@@ -2682,7 +2756,7 @@ DWORD WINAPI kdQuerySystemInformation(
 
     do {
 
-        miSpace = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation);
+        miSpace = (PRTL_PROCESS_MODULES)supGetSystemInfo(SystemModuleInformation, NULL);
         if (miSpace == NULL)
             break;
 
@@ -2769,8 +2843,15 @@ VOID kdInit(
     RtlSecureZeroMemory(&g_SystemCallbacks, sizeof(g_SystemCallbacks));
 
     g_kdctx.ShowKdError = TRUE;
+    g_kdctx.IsFullAdmin = IsFullAdmin;
+
+    //
+    // Default driver load status.
+    //
+    g_kdctx.drvOpenLoadStatus = ERROR_NOT_CAPABLE;
 
     InitializeListHead(&g_kdctx.ObCollection.ListHead);
+    RtlInitializeCriticalSection(&g_kdctx.ListLock);
 
     //
     // Minimum supported client is windows 7
@@ -2831,7 +2912,7 @@ VOID kdInit(
         //
         // Try to open existing device.
         //
-        if (scmOpenDevice(KLDBGDRV, &g_kdctx.hDevice) == FALSE) {
+        if (scmOpenDevice(KLDBGDRV, &g_kdctx.hDevice, &g_kdctx.drvOpenLoadStatus) == FALSE) {
 
             //
             // No such device exist, construct filepath and check if driver already present.
@@ -2850,7 +2931,8 @@ VOID kdInit(
             //
             // Load service driver and open handle for it.
             //
-            g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV, szDrvPath, &g_kdctx.hDevice);
+            g_kdctx.drvOpenLoadStatus = ERROR_SUCCESS;
+            g_kdctx.IsOurLoad = scmLoadDeviceDriver(KLDBGDRV, szDrvPath, &g_kdctx.hDevice, &g_kdctx.drvOpenLoadStatus);
         }
 
     }
@@ -2862,21 +2944,19 @@ VOID kdInit(
 
         ObpInitInfoBlockOffsets();
 
-        RtlInitializeCriticalSection(&g_kdctx.ListLock);
-
         kdQuerySystemInformation(&g_kdctx);
     }
 }
 
 /*
-* KdFindCiCallbacks
+* kdFindCiCallbacks
 *
 * Purpose:
 *
 * Locate address of ntoskrnl g_CiCallbacks/SeCiCallbacks structure.
 *
 */
-ULONG_PTR KdFindCiCallbacks(
+ULONG_PTR kdFindCiCallbacks(
     _In_ PKLDBGCONTEXT Context
 )
 {
@@ -2884,8 +2964,9 @@ ULONG_PTR KdFindCiCallbacks(
 
     ULONG_PTR Address = 0, Result = 0;
 
-    PBYTE   Signature = NULL, ptrCode = NULL, MatchingPattern = NULL;
-    ULONG   SignatureSize = 0;
+    PBYTE   Signature = NULL, ptrCode = NULL, InstructionMatchPattern = NULL;
+    ULONG   SignatureSize = 0, InstructionMatchLength;
+    ULONG   InstructionExactMatchLength;
 
     PVOID   SectionBase;
     ULONG   SectionSize = 0, Index;
@@ -2909,62 +2990,65 @@ ULONG_PTR KdFindCiCallbacks(
         if ((SectionBase == 0) || (SectionSize == 0))
             break;
 
-        MatchingPattern = SeCiCallbacksMatchingPattern; //default matching pattern
+        InstructionMatchPattern = SeCiCallbacksMatchingPattern; //default matching pattern
+        InstructionMatchLength = 7; //lea
+        InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern);
 
         switch (g_NtBuildNumber) {
 
         case 7601:
             Signature = g_CiCallbacksPattern_7601;
             SignatureSize = sizeof(g_CiCallbacksPattern_7601);
-            MatchingPattern = g_CiCallbacksMatchingPattern;
+            InstructionMatchPattern = g_CiCallbacksMatchingPattern;
+            InstructionExactMatchLength = RTL_NUMBER_OF(g_CiCallbacksMatchingPattern);
             break;
 
         case 9200:
         case 9600:
             Signature = SeCiCallbacksPattern_9200_9600;
             SignatureSize = sizeof(SeCiCallbacksPattern_9200_9600);
-            MatchingPattern = SeCiCallbacksMatchingPattern;
             break;
 
         case 10240:
         case 10586:
             Signature = SeCiCallbacksPattern_10240_10586;
             SignatureSize = sizeof(SeCiCallbacksPattern_10240_10586);
-            MatchingPattern = SeCiCallbacksMatchingPattern;
             break;
 
         case 14393:
             Signature = SeCiCallbacksPattern_14393;
             SignatureSize = sizeof(SeCiCallbacksPattern_14393);
-            MatchingPattern = SeCiCallbacksMatchingPattern;
             break;
 
         case 15063:
         case 16299:
             Signature = SeCiCallbacksPattern_15063_16299;
             SignatureSize = sizeof(SeCiCallbacksPattern_15063_16299);
-            MatchingPattern = SeCiCallbacksMatchingPattern;
             break;
 
         case 17134:
         case 17763:
             Signature = SeCiCallbacksPattern_17134_17763;
             SignatureSize = sizeof(SeCiCallbacksPattern_17134_17763);
-            MatchingPattern = SeCiCallbacksMatchingPattern;
             break;
 
         default:
+            Signature = SeCiCallbacksPattern_19H1;
+            SignatureSize = sizeof(SeCiCallbacksPattern_19H1);
+            InstructionMatchPattern = SeCiCallbacksMatchingPattern_19H1;
+            InstructionMatchLength = 10; //mov
+            InstructionExactMatchLength = RTL_NUMBER_OF(SeCiCallbacksMatchingPattern_19H1);
             break;
         }
 
-        if ((SignatureSize) && (Signature)) {
+        //if ((SignatureSize) && (Signature)) {
 
-            ptrCode = (PBYTE)supFindPattern(
-                (PBYTE)SectionBase,
-                SectionSize,
-                Signature,
-                SignatureSize);
-        }
+        ptrCode = (PBYTE)supFindPattern(
+            (PBYTE)SectionBase,
+            SectionSize,
+            Signature,
+            SignatureSize);
+        //}
 
         if (ptrCode == NULL)
             break;
@@ -2994,14 +3078,18 @@ ULONG_PTR KdFindCiCallbacks(
                 break;
             //
             // mov cs:g_CiCallbacks, rax (for Windows 7)
-            // lea rcx, SeCiCallbacks (for everything else)
+            // lea rcx, SeCiCallbacks (for 8/10 TH/RS)
+            // mov cs:SeCiCallbacks (19H1)
             //
-            if (hs.len == 7) {
-                if ((ptrCode[Index] == MatchingPattern[0]) &&
-                    (ptrCode[Index + 1] == MatchingPattern[1]) &&
-                    (ptrCode[Index + 2] == MatchingPattern[2]))
+            if (hs.len == InstructionMatchLength) {
+
+                //
+                // Match block found.
+                //
+                if (RtlCompareMemory((VOID*)&ptrCode[Index], (VOID*)InstructionMatchPattern,
+                    InstructionExactMatchLength) == InstructionExactMatchLength)
                 {
-                    Rel = *(PLONG)(ptrCode + Index + 3);
+                    Rel = *(PLONG)(ptrCode + Index + InstructionExactMatchLength);
                     break;
                 }
             }
@@ -3055,7 +3143,7 @@ VOID kdShutdown(
     // Windbg recreates service and drops file everytime when kernel debug starts.
     //
     if (g_kdctx.IsOurLoad) {
-        scmUnloadDeviceDriver(KLDBGDRV);
+        scmUnloadDeviceDriver(KLDBGDRV, NULL);
 
         //
         // Driver file is no longer needed.
