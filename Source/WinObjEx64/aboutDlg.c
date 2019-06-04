@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.73
+*  VERSION:     1.74
 *
-*  DATE:        30 Mar 2019
+*  DATE:        27 May 2019
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -18,8 +18,9 @@
 #include "global.h"
 #include "msvcver.h"
 
+#undef _WINE_NB_DEBUG
+
 HWND g_hwndGlobals;
-HFONT _hFontGlobalsDlg;
 WNDPROC g_GlobalsEditOriginalWndProc;
 
 /*
@@ -40,21 +41,31 @@ VOID AboutDialogInit(
     HANDLE   hImage;
     WCHAR    szBuffer[MAX_PATH];
 
+    PCHAR    wine_ver, wine_str;
+
     SYSTEM_BOOT_ENVIRONMENT_INFORMATION sbei;
     SYSTEM_VHD_BOOT_INFORMATION *psvbi;
 
     SetDlgItemText(hwndDlg, ID_ABOUT_PROGRAM, PROFRAM_NAME_AND_TITLE);
     SetDlgItemText(hwndDlg, ID_ABOUT_BUILDINFO, PROGRAM_VERSION);
 
+    //
+    // Set dialog icon.
+    //
     hImage = LoadImage(g_WinObj.hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN), IMAGE_ICON, 48, 48, LR_SHARED);
     if (hImage) {
         SendMessage(GetDlgItem(hwndDlg, ID_ABOUT_ICON), STM_SETIMAGE, IMAGE_ICON, (LPARAM)hImage);
         DestroyIcon((HICON)hImage);
     }
 
-    //remove class icon if any
+    //
+    // Remove class icon if any.
+    //
     SetClassLongPtr(hwndDlg, GCLP_HICON, (LONG_PTR)NULL);
 
+    //
+    // Set compiler version and name.
+    //
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     _strcpy(szBuffer, VC_VER);
     if (szBuffer[0] == 0) {
@@ -70,40 +81,70 @@ VOID AboutDialogInit(
 
     SetDlgItemText(hwndDlg, ID_ABOUT_COMPILERINFO, szBuffer);
 
+    //
+    // Set build date and time.
+    //
     RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
     MultiByteToWideChar(CP_ACP, 0, __DATE__, (INT)_strlen_a(__DATE__), _strend(szBuffer), 40);
     _strcat(szBuffer, TEXT(" "));
     MultiByteToWideChar(CP_ACP, 0, __TIME__, (INT)_strlen_a(__TIME__), _strend(szBuffer), 40);
     SetDlgItemText(hwndDlg, ID_ABOUT_BUILDDATE, szBuffer);
 
-    // fill OS name
-    rtl_swprintf_s(szBuffer, 100, TEXT("Windows NT %1u.%1u (build %u"),
+#ifdef _WINE_NB_DEBUG
+    g_WinObj.IsWine = TRUE;
+    wine_ver = "4.9";
+#endif
+
+    //
+    // Fill OS name.
+    //
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+    if (g_WinObj.IsWine) {
+        _strcpy(szBuffer, TEXT("Reported as "));
+    }
+
+    rtl_swprintf_s(_strend(szBuffer), 100, TEXT("Windows NT %1u.%1u (build %u"),
         g_WinObj.osver.dwMajorVersion, g_WinObj.osver.dwMinorVersion, g_WinObj.osver.dwBuildNumber);
     if (g_WinObj.osver.szCSDVersion[0]) {
         _strcat(szBuffer, TEXT(", "));
         _strcat(szBuffer, g_WinObj.osver.szCSDVersion);
     }
     _strcat(szBuffer, TEXT(")"));
-    SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, szBuffer);
 
-    // fill boot options
-    RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
-    
+    //
+    // Fill boot options.
+    //   
     if (g_WinObj.IsWine) {
-
-        SetDlgItemTextA(hwndDlg, ID_ABOUT_ADVINFO, wine_get_version());
+#ifndef _WINE_NB_DEBUG
+        wine_ver = (PCHAR)wine_get_version();
+#endif
+        wine_str = (PCHAR)supHeapAlloc(_strlen_a(wine_ver) + MAX_PATH);
+        if (wine_str) {
+            _strcpy_a(wine_str, "Wine ");
+            _strcat_a(wine_str, wine_ver);
+            _strcat_a(wine_str, " emulation");
+            SetDlgItemTextA(hwndDlg, ID_ABOUT_OSNAME, wine_str);
+            supHeapFree(wine_str);
+        }
+        SetDlgItemText(hwndDlg, ID_ABOUT_ADVINFO, szBuffer);
 
     }
     else {
+        SetDlgItemText(hwndDlg, ID_ABOUT_OSNAME, szBuffer);
 
         RtlSecureZeroMemory(&sbei, sizeof(sbei));
+        RtlSecureZeroMemory(&szBuffer, sizeof(szBuffer));
 
-        // query kd debugger enabled
+        //
+        // Query KD debugger enabled.
+        //
         if (kdIsDebugBoot()) {
             _strcpy(szBuffer, TEXT("Debug, "));
         }
 
-        // query vhd boot state if possible
+        //
+        // Query VHD boot state if possible.
+        //
         psvbi = (SYSTEM_VHD_BOOT_INFORMATION*)supHeapAlloc(PAGE_SIZE);
         if (psvbi) {
             status = NtQuerySystemInformation(SystemVhdBootInformation, psvbi, PAGE_SIZE, &returnLength);
@@ -115,7 +156,9 @@ VOID AboutDialogInit(
             supHeapFree(psvbi);
         }
 
-        // query firmware mode and secure boot state for uefi
+        //
+        // Query firmware mode and SecureBoot state for UEFI.
+        //
         status = NtQuerySystemInformation(SystemBootEnvironmentInformation, &sbei, sizeof(sbei), &returnLength);
         if (NT_SUCCESS(status)) {
 
@@ -167,6 +210,9 @@ VOID AboutDialogCollectGlobals(
 {
     BOOLEAN bAllowed;
 
+    //
+    // Copy os name as is.
+    //
     GetDlgItemText(hwndParent, ID_ABOUT_OSNAME, lpDestBuffer, MAX_PATH);
 
     _strcat(lpDestBuffer, TEXT("\r\n"));
@@ -266,13 +312,15 @@ LRESULT CALLBACK GlobalsCustomWindowProc(
     _In_ LPARAM lParam
 )
 {
+    HFONT hFont;
+
     switch (uMsg) {
-    case WM_DESTROY:
-        if (_hFontGlobalsDlg) {
-            DeleteObject(_hFontGlobalsDlg);
-        }
-        break;
     case WM_CLOSE:
+        hFont = (HFONT)GetProp(hwnd, T_PROP_FONT);
+        if (hFont) {
+            DeleteObject(hFont);
+        }
+        RemoveProp(hwnd, T_PROP_FONT);
         g_hwndGlobals = NULL;
         break;
     default:
@@ -294,20 +342,9 @@ INT_PTR AboutDialogShowGlobals(
 {
     HWND hwnd;
     LPWSTR lpGlobalInfo;
-    NONCLIENTMETRICS ncm;
+    HFONT hFont = NULL;
 
-    if (g_hwndGlobals == NULL) {
-
-        ncm.cbSize = sizeof(NONCLIENTMETRICS);
-        if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0)) {
-            ncm.lfCaptionFont.lfHeight += ncm.lfSmCaptionFont.lfHeight / 4;
-            ncm.lfCaptionFont.lfWeight = FW_NORMAL;
-            ncm.lfCaptionFont.lfQuality = CLEARTYPE_QUALITY;
-            ncm.lfCaptionFont.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-            _strcpy(ncm.lfCaptionFont.lfFaceName, TEXT("Courier New"));
-
-            _hFontGlobalsDlg = CreateFontIndirect(&ncm.lfCaptionFont);
-        }
+    if (g_hwndGlobals == NULL) {      
 
         hwnd = CreateWindowEx(
             0,
@@ -324,7 +361,11 @@ INT_PTR AboutDialogShowGlobals(
             NULL);
 
         if (hwnd) {
-            SendMessage(hwnd, WM_SETFONT, (WPARAM)_hFontGlobalsDlg, 0);
+            hFont = supCreateFontIndirect(T_DEFAULT_AUX_FONT);
+            if (hFont) {
+                SendMessage(hwnd, WM_SETFONT, (WPARAM)hFont, 0);
+                SetProp(hwnd, T_PROP_FONT, hFont);
+            }
             g_GlobalsEditOriginalWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
             if (g_GlobalsEditOriginalWndProc) {
                 SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&GlobalsCustomWindowProc);
