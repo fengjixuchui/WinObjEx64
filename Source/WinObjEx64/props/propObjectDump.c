@@ -6,7 +6,7 @@
 *
 *  VERSION:     1.83
 *
-*  DATE:        05 Jan 2020
+*  DATE:        26 Jan 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -1113,6 +1113,9 @@ VOID propObDumpDriverObject(
         //DriverStart
         propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverStart"), NULL, drvObject.DriverStart, 0, 0);
 
+        //DriverSize
+        propObDumpUlong(g_TreeList, h_tviRootItem, TEXT("DriverSize"), NULL, drvObject.DriverSize, TRUE, FALSE, 0, 0);
+
         //DriverSection
         propObDumpAddress(g_TreeList, h_tviRootItem, TEXT("DriverSection"), TEXT("PLDR_DATA_TABLE_ENTRY"), drvObject.DriverSection, 0, 0);
 
@@ -1659,7 +1662,19 @@ VOID propObDumpDeviceObject(
         propObDumpAddress(g_TreeList, h_tviRootItem, L"Vpb", lpType, devObject.Vpb, 0, 0);
 
         //DeviceExtension
-        propObDumpAddress(g_TreeList, h_tviRootItem, L"DeviceExtension", NULL, devObject.DeviceExtension, 0, 0);
+        BgColor = 0;
+        lpType = NULL;
+
+        //
+        // Check DeviceExtension to be valid as it size is a part of total DEVICE_OBJECT allocation size.
+        //
+        if (devObject.DeviceExtension != NULL) {
+            if (devObject.Size == sizeof(DEVICE_OBJECT)) {
+                BgColor = CLR_WARN;
+                lpType = L"! Must be NULL";
+            }
+        }
+        propObDumpAddress(g_TreeList, h_tviRootItem, L"DeviceExtension", lpType, devObject.DeviceExtension, BgColor, 0);
 
         //DeviceType
         lpType = NULL;
