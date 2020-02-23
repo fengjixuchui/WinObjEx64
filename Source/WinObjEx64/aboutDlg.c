@@ -4,9 +4,9 @@
 *
 *  TITLE:       ABOUTDLG.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.84
 *
-*  DATE:        16 Jan 2020
+*  DATE:        22 Feb 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -499,7 +499,9 @@ VOID AboutDialogCollectGlobals(
     if (g_kdctx.DriverOpenLoadStatus == STATUS_SUCCESS) {
         _strcat(szBuffer, TEXT(" (reported as OK)"));
     }
-    AddParameterValue(hwndOutput, TEXT("DriverOpenLoadStatus"), szBuffer);
+    AddParameterValue(hwndOutput, TEXT("DriverOpenLoadStatus"), szBuffer);    
+    
+    AddParameterValue32Hex(hwndOutput, TEXT("DriverOpenStatus"), g_kdctx.DriverOpenStatus);
 
     AddParameterValueUlong(hwndOutput, TEXT("IsSecureBoot"), g_kdctx.IsSecureBoot);
 
@@ -536,6 +538,11 @@ VOID AboutDialogCollectGlobals(
     //
     AddParameterValueUlong(hwndOutput, TEXT("UseExperimentalFeatures"), g_WinObj.UseExperimentalFeatures);
     AddParameterValueUlong(hwndOutput, TEXT("IsWine"), g_WinObj.IsWine);
+
+    //
+    // For MMIO usage.
+    //
+    AddParameterValueUlong(hwndOutput, TEXT("EnableFullMitigations"), g_WinObj.EnableFullMitigations);
 
     //
     // List other data.
