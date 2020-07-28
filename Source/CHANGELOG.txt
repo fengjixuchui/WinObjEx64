@@ -1,8 +1,20 @@
+v1.8.7
+20h1/20h2/21h1 compatibility improvements
+added recognizing of shimmed drivers for drivers list (win10+)
+show process trust label for sections if it present
+plugins system extended and upgraded to support context plugins
+added imagescope plugin for section object types backed by imagefile
+added plugins viewer
+various minor changes
+treelist: fix tooltips flickering on Windows 7
+
 v1.8.6
 reimplemented directory object dump to output more data
 added callbacks registered with ExRegisterExtension
 fix for pipes (PR #17)
 internal rearrange
+fix high cpu usage for splitter drag (report/fix by RamMerlabs) 
+fix security dialog regression (reported by RamMerlabs) 
 
 v1.8.5
 fix object cookie

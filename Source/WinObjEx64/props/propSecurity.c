@@ -4,9 +4,9 @@
 *
 *  TITLE:       PROPSECURITY.C
 *
-*  VERSION:     1.83
+*  VERSION:     1.87
 *
-*  DATE:        05 Jan 2020
+*  DATE:        11 July 2020
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -28,7 +28,7 @@
 *
 */
 BOOL propSecurityObjectSupported(
-    _In_ INT nTypeIndex
+    _In_ UINT nTypeIndex
 )
 {
     if ((nTypeIndex != ObjectTypeFile) &&
@@ -36,6 +36,7 @@ BOOL propSecurityObjectSupported(
         (nTypeIndex != ObjectTypeDevice) &&
         (nTypeIndex != ObjectTypeSection) &&
         (nTypeIndex != ObjectTypeEvent) &&
+        (nTypeIndex != ObjectTypeEventPair) &&
         (nTypeIndex != ObjectTypeMutant) &&
         (nTypeIndex != ObjectTypeDesktop) &&
         (nTypeIndex != ObjectTypeKey) &&
@@ -367,7 +368,7 @@ HRESULT STDMETHODCALLTYPE GetSecurity(
         );
     }
 
-    hResult = HRESULT_FROM_NT(status);
+    hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
     *ppSecurityDescriptor = PSD;
 
 Done:
@@ -395,7 +396,7 @@ HRESULT STDMETHODCALLTYPE SetSecurity(
 
     //cleanup
     This->CloseObjectMethod(This->ObjectContext, hObject);
-    return HRESULT_FROM_NT(status);
+    return HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
 }
 
 HRESULT STDMETHODCALLTYPE MapGeneric(
@@ -498,7 +499,7 @@ HRESULT propSecurityConstructor(
         bytesNeeded = 0;
         status = NtQueryObject(hObject, ObjectTypeInformation, NULL, 0, &bytesNeeded);
         if (bytesNeeded == 0) {
-            hResult = HRESULT_FROM_NT(status);
+            hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
             break;
         }
 
@@ -511,7 +512,7 @@ HRESULT propSecurityConstructor(
         status = NtQueryObject(hObject, ObjectTypeInformation, TypeInfo,
             bytesNeeded, &bytesNeeded);
         if (!NT_SUCCESS(status)) {
-            hResult = HRESULT_FROM_NT(status);
+            hResult = HRESULT_FROM_WIN32(RtlNtStatusToDosError(status));
             break;
         }
 
